@@ -1,0 +1,160 @@
+fileFormatVersion: 2
+guid: 3bc393fbbde281344a7b282836273e9a
+labels:
+- game
+- pool
+- billiard
+- center
+- ball
+timeCreated: 1470828342
+licenseType: Store
+ModelImporter:
+  serializedVersion: 18
+  fileIDToRecycleName:
+    100000: ball_10_stripe
+    100002: ball_11_stripe
+    100004: ball_12_stripe
+    100006: ball_13_stripe
+    100008: ball_14_stripe
+    100010: ball_15_stripe
+    100012: ball_1_solid
+    100014: ball_2_solid
+    100016: ball_3_solid
+    100018: ball_4_solid
+    100020: ball_5_solid
+    100022: ball_6_solid
+    100024: ball_7_solid
+    100026: ball_9_stripe
+    100028: ball_black
+    100030: ball_white
+    100032: //RootNode
+    400000: ball_10_stripe
+    400002: ball_11_stripe
+    400004: ball_12_stripe
+    400006: ball_13_stripe
+    400008: ball_14_stripe
+    400010: ball_15_stripe
+    400012: ball_1_solid
+    400014: ball_2_solid
+    400016: ball_3_solid
+    400018: ball_4_solid
+    400020: ball_5_solid
+    400022: ball_6_solid
+    400024: ball_7_solid
+    400026: ball_9_stripe
+    400028: ball_black
+    400030: ball_white
+    400032: //RootNode
+    2300000: ball_10_stripe
+    2300002: ball_11_stripe
+    2300004: ball_12_stripe
+    2300006: ball_13_stripe
+    2300008: ball_14_stripe
+    2300010: ball_15_stripe
+    2300012: ball_1_solid
+    2300014: ball_2_solid
+    2300016: ball_3_solid
+    2300018: ball_4_solid
+    2300020: ball_5_solid
+    2300022: ball_6_solid
+    2300024: ball_7_solid
+    2300026: ball_9_stripe
+    2300028: ball_black
+    2300030: ball_white
+    3300000: ball_10_stripe
+    3300002: ball_11_stripe
+    3300004: ball_12_stripe
+    3300006: ball_13_stripe
+    3300008: ball_14_stripe
+    3300010: ball_15_stripe
+    3300012: ball_1_solid
+    3300014: ball_2_solid
+    3300016: ball_3_solid
+    3300018: ball_4_solid
+    3300020: ball_5_solid
+    3300022: ball_6_solid
+    3300024: ball_7_solid
+    3300026: ball_9_stripe
+    3300028: ball_black
+    3300030: ball_white
+    4300000: ball_white
+    4300002: ball_13_stripe
+    4300004: ball_5_solid
+    4300006: ball_14_stripe
+    4300008: ball_11_stripe
+    4300010: ball_12_stripe
+    4300012: ball_10_stripe
+    4300014: ball_9_stripe
+    4300016: ball_black
+    4300018: ball_7_solid
+    4300020: ball_6_solid
+    4300022: ball_15_stripe
+    4300024: ball_4_solid
+    4300026: ball_3_solid
+    4300028: ball_2_solid
+    4300030: ball_1_solid
+  materials:
+    importMaterials: 1
+    materialName: 0
+    materialSearch: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    optimizeGameObjects: 0
+    motionNodeName: 
+    animationCompression: 1
+    animationRotationError: .5
+    animationPositionError: .5
+    animationScaleError: .5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    clipAnimations: []
+    isReadable: 1
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1
+    meshCompression: 0
+    addColliders: 0
+    importBlendShapes: 1
+    swapUVChannels: 0
+    generateSecondaryUV: 0
+    useFileUnits: 1
+    optimizeMeshForGPU: 1
+    keepQuads: 0
+    weldVertices: 1
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15.000001
+    secondaryUVHardAngle: 88
+    secondaryUVPackMargin: 4
+    useFileScale: 1
+  tangentSpace:
+    normalSmoothAngle: 60
+    splitTangentsAcrossUV: 1
+    normalImportMode: 0
+    tangentImportMode: 1
+  importAnimation: 1
+  copyAvatar: 0
+  humanDescription:
+    human: []
+    skeleton: []
+    armTwist: .5
+    foreArmTwist: .5
+    upperLegTwist: .5
+    legTwist: .5
+    armStretch: .0500000007
+    legStretch: .0500000007
+    feetSpacing: 0
+    rootMotionBoneName: 
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  animationType: 0
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 69319
+  packageName: Billiard Game Kit
+  packageVersion: 1.0
+  assetPath: Assets/Billiard_Table/Models/balls_centered.FBX
+  uploadId: 133134

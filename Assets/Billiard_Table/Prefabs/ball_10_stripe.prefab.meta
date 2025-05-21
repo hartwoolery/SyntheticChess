@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 50c3d57a7f5d81549b883f7673e15730
+timeCreated: 1471600361
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 69319
+  packageName: Billiard Game Kit
+  packageVersion: 1.0
+  assetPath: Assets/Billiard_Table/Prefabs/ball_10_stripe.prefab
+  uploadId: 133134

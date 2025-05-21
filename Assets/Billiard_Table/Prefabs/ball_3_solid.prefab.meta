@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 134b5d41cde7d5347ab8bad113f3d071
+timeCreated: 1471600400
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 69319
+  packageName: Billiard Game Kit
+  packageVersion: 1.0
+  assetPath: Assets/Billiard_Table/Prefabs/ball_3_solid.prefab
+  uploadId: 133134

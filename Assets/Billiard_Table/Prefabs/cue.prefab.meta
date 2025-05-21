@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: dadae4c0e44715d42bffb38e653d620c
+timeCreated: 1471600150
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 69319
+  packageName: Billiard Game Kit
+  packageVersion: 1.0
+  assetPath: Assets/Billiard_Table/Prefabs/cue.prefab
+  uploadId: 133134
