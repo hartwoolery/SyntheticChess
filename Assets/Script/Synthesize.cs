@@ -8,71 +8,64 @@ using UnityEngine.Rendering.Universal;
 
 public class Synthesize : MonoBehaviour
 {
-    //[Header("Generation Settings")]
-    private int totalImages = 20;
-    private float trainSplit = 0.7f;
-    private float validSplit = 0.2f;
-    private string outputFolder = "SyntheticPoolData";
+    [Header("Generation Settings")]
+     private int totalImages = 6000;
+     private float trainSplit = 0.75f;
+     private float validSplit = 0.2f;
+    private string outputFolder = "SyntheticChessData";
     
-    ////[Header("Ball Settings")]
-    private float tableWidth = 1.27f; // Standard pool table width
-    private float tableLength = 2.54f; // Standard pool table length
-    private float tableHeight = 0.805f; // Standard pool table height + ball radius
-    private float ballRadius = 0.028575f; // Standard pool ball radius in meters
+    [Header("Chess Board Settings")]
+    [SerializeField] private ChessBoardSetup[] chessBoards;
+    private ChessBoardSetup activeBoard;
     
-    //[Header("Cue Settings")]
-    [SerializeField] private Transform cueStick; // Reference to the cue stick object
-    private float minCueDistance = 0.03f; // Minimum distance from cue ball
-    private float maxCueDistance = 0.25f; // Maximum distance from cue ball
-    private float minCueAngle = -25.0f; // Minimum angle from horizontal
-    private float maxCueAngle = -5.0f; // Maximum angle from horizontal
-
-    //[Header("Camera Settings")]
-    private Camera mainCamera;
-    private float minPlayerHeight = 1.0f; // Minimum player height in meters
-    private float maxPlayerHeight = 1.6f; // Maximum player height in meters
-    private float minDistanceFromTable = 0.0f; // Minimum distance from table edge
-    private float maxDistanceFromTable = 1.0f; // Maximum distance from table edge
-    private float minLookAngle = -15f; // Minimum angle to look down
-    private float maxLookAngle = 5f; // Maximum angle to look down
-    private int renderWidth = 512; 
-    private int renderHeight = 512;
+    [Header("Camera Settings")]
+     [SerializeField] private Camera mainCamera;
+     private float minDistanceFromBoard = 0.4f;
+     private float maxDistanceFromBoard = 2.5f;
+     private int renderWidth = 512;
+     private int renderHeight = 512;
     
-    //[Header("Lighting Settings")]
+    [Header("Lighting Settings")]
     [SerializeField] private Light[] sceneLights;
-    private float minIntensity = 1.0f; // Increased minimum intensity
-    private float maxIntensity = 3.0f; // Increased maximum intensity
-    private float ambientIntensity = 1.0f; // Added ambient intensity
+     private float minIntensity = 1.0f;
+     private float maxIntensity = 1.5f;
+     private float ambientIntensity = 1.0f;
+     private float minShadowStrength = 0.3f;
+     private float maxShadowStrength = 0.8f;
+     private float minShadowBias = 0.01f;
+     private float maxShadowBias = 0.05f;
+     private float minShadowNormalBias = 0.1f;
+     private float maxShadowNormalBias = 0.4f;
     
-    //[Header("Debug Settings")]
-    
-    //[Header("Motion Blur Settings")]
-    private float motionBlurChance = 0.0f; // 50% chance of motion blur
-    private float minForce = 10f;
-    private float maxForce = 15f;
-    
-    private List<Transform> poolBalls = new List<Transform>();
-
-    private List<Transform> tablePockets = new List<Transform>();
-    private string[] splitFolders = { "train", "valid", "test" };
-
     [Header("Skybox Settings")]
-    [SerializeField] private Cubemap[] skyboxTextures; // List of skybox cubemaps to choose from
-
-    [Header("Table Settings")]
-    [SerializeField] private Material tableMaterial; // Reference to the pool table material
-    [SerializeField] private Texture2D[] tableTextures; // List of felt textures to choose from
-    [SerializeField] private float minTableRoughness = 0.3f; // Minimum roughness for the table
-    [SerializeField] private float maxTableRoughness = 0.7f; // Maximum roughness for the table
-
+    [SerializeField] private Cubemap[] skyboxTextures;
+    
     [Header("Post-Processing")]
-    private Volume postProcessVolume;
+    [SerializeField]private Volume postProcessVolume;
     private Bloom bloom;
     private ColorAdjustments colorAdjustments;
     private Vignette vignette;
     private ChromaticAberration chromaticAberration;
     private FilmGrain filmGrain;
 
+    private string[] splitFolders = { "train", "valid", "test" };
+
+    // Add class mapping for YOLO format
+    private Dictionary<string, int> classMapping = new Dictionary<string, int>
+    {
+        {"Black bishop", 0},  // b
+        {"Black king", 1},    // k
+        {"Black knight", 2},  // n
+        {"Black pawn", 3},    // p
+        {"Black queen", 4},   // q
+        {"Black rook", 5},    // r
+        {"White bishop", 6},  // B
+        {"White king", 7},    // K
+        {"White knight", 8},  // N
+        {"White pawn", 9},    // P
+        {"White queen", 10},  // Q
+        {"White rook", 11}    // R
+    };
 
     void Start()
     {
@@ -98,98 +91,9 @@ public class Synthesize : MonoBehaviour
         mainCamera.depthTextureMode = DepthTextureMode.DepthNormals;
 
         // Initialize post-processing
-        if (postProcessVolume == null)
-        {
-            Debug.Log("Searching for Post Process Volume in scene...");
-            postProcessVolume = FindFirstObjectByType<Volume>();
-            if (postProcessVolume != null)
-            {
-                Debug.Log($"Found Post Process Volume: {postProcessVolume.name}");
-            }
-            else
-            {
-                Debug.LogError("No Post Process Volume found in scene!");
-                // Create a new Volume if none exists
-                GameObject volumeObj = new GameObject("Post Process Volume");
-                postProcessVolume = volumeObj.AddComponent<Volume>();
-                postProcessVolume.isGlobal = true;
-                postProcessVolume.priority = 1;
-                Debug.Log("Created new Post Process Volume");
-            }
-        }
-            
-        if (postProcessVolume != null)
-        {
-            Debug.Log($"Post Process Volume profile is {(postProcessVolume.profile != null ? "assigned" : "null")}");
-            if (postProcessVolume.profile == null)
-            {
-                // Create a new profile if none exists
-                postProcessVolume.profile = ScriptableObject.CreateInstance<VolumeProfile>();
-                Debug.Log("Created new Volume Profile");
-            }
+        InitializePostProcessing();
 
-            Debug.Log("Attempting to get post-processing effects...");
-            bool gotBloom = postProcessVolume.profile.TryGet(out bloom);
-            bool gotColorAdjustments = postProcessVolume.profile.TryGet(out colorAdjustments);
-            bool gotVignette = postProcessVolume.profile.TryGet(out vignette);
-            bool gotCA = postProcessVolume.profile.TryGet(out chromaticAberration);
-            bool gotGrain = postProcessVolume.profile.TryGet(out filmGrain);
-
-            Debug.Log($"Got effects: Bloom={gotBloom}, ColorAdjustments={gotColorAdjustments}, Vignette={gotVignette}, CA={gotCA}, Grain={gotGrain}");
-
-            // Add missing effects
-            if (!gotBloom) bloom = postProcessVolume.profile.Add<Bloom>(true);
-            if (!gotColorAdjustments) colorAdjustments = postProcessVolume.profile.Add<ColorAdjustments>(true);
-            if (!gotVignette) vignette = postProcessVolume.profile.Add<Vignette>(true);
-            if (!gotCA) chromaticAberration = postProcessVolume.profile.Add<ChromaticAberration>(true);
-            if (!gotGrain) filmGrain = postProcessVolume.profile.Add<FilmGrain>(true);
-
-            // // Set initial values to make effects obvious
-            // if (bloom != null)
-            // {
-            //     bloom.intensity.value = 2.0f;
-            //     bloom.threshold.value = 0.5f;
-            //     bloom.scatter.value = 0.7f;
-            // }
-            // if (colorAdjustments != null)
-            // {
-            //     colorAdjustments.postExposure.value = 0f;
-            //     colorAdjustments.contrast.value = 20f;
-            //     colorAdjustments.colorFilter.value = new Color(0.8f, 0.8f, 1.2f); // Slight blue tint
-            //     colorAdjustments.hueShift.value = 1.0f;
-            //     colorAdjustments.saturation.value = 20f;
-            // }
-            // if (vignette != null)
-            // {
-            //     vignette.intensity.value = 0.5f;
-            //     vignette.smoothness.value = 0.5f;
-            // }
-            // if (chromaticAberration != null)
-            // {
-            //     chromaticAberration.intensity.value = 1.0f;
-            // }
-            // if (filmGrain != null)
-            // {
-            //     filmGrain.intensity.value = 0.5f;
-            //     filmGrain.type.value = FilmGrainLookup.Thin1;
-            // }
-        }
-
-        // Find all pool balls
-        foreach (Transform child in transform)
-        {
-            if (child.name.Contains("ball_"))
-                poolBalls.Add(child);
-        }
-
-        // Find all table pockets
-        foreach (Transform child in transform)
-        {
-            if (child.name.Contains("pocket"))
-                tablePockets.Add(child);
-        }
         
-
         // Clean up old files
         CleanupOutputDirectory();
 
@@ -200,12 +104,46 @@ public class Synthesize : MonoBehaviour
         GenerateDataset();
     }
 
+    
+
+    void InitializePostProcessing()
+    {
+        if (postProcessVolume == null)
+        {
+            postProcessVolume = FindFirstObjectByType<Volume>();
+            if (postProcessVolume == null)
+            {
+                GameObject volumeObj = new GameObject("Post Process Volume");
+                postProcessVolume = volumeObj.AddComponent<Volume>();
+                postProcessVolume.isGlobal = true;
+                postProcessVolume.priority = 1;
+            }
+        }
+            
+        if (postProcessVolume.profile == null)
+        {
+            postProcessVolume.profile = ScriptableObject.CreateInstance<VolumeProfile>();
+        }
+
+        // Get or add post-processing effects
+        postProcessVolume.profile.TryGet(out bloom);
+        postProcessVolume.profile.TryGet(out colorAdjustments);
+        postProcessVolume.profile.TryGet(out vignette);
+        postProcessVolume.profile.TryGet(out chromaticAberration);
+        postProcessVolume.profile.TryGet(out filmGrain);
+
+        // if (!postProcessVolume.profile.TryGet(out bloom)) bloom = postProcessVolume.profile.Add<Bloom>(false);
+        // if (!postProcessVolume.profile.TryGet(out colorAdjustments)) colorAdjustments = postProcessVolume.profile.Add<ColorAdjustments>(false);
+        // if (!postProcessVolume.profile.TryGet(out vignette)) vignette = postProcessVolume.profile.Add<Vignette>(false);
+        // if (!postProcessVolume.profile.TryGet(out chromaticAberration)) chromaticAberration = postProcessVolume.profile.Add<ChromaticAberration>(false);
+        // if (!postProcessVolume.profile.TryGet(out filmGrain)) filmGrain = postProcessVolume.profile.Add<FilmGrain>(false);
+    }
+
     void CleanupOutputDirectory()
     {
         string basePath = Path.Combine(Application.dataPath, "..", outputFolder);
         if (Directory.Exists(basePath))
         {
-            //Debug.Log($"Cleaning up old files in: {basePath}");
             Directory.Delete(basePath, true);
         }
     }
@@ -213,7 +151,6 @@ public class Synthesize : MonoBehaviour
     void CreateOutputDirectories()
     {
         string basePath = Path.Combine(Application.dataPath, "..", outputFolder);
-        //Debug.Log($"Saving dataset to: {basePath}");
         
         foreach (string split in splitFolders)
         {
@@ -221,9 +158,6 @@ public class Synthesize : MonoBehaviour
             string labelsPath = Path.Combine(basePath, split, "labels");
             Directory.CreateDirectory(imagesPath);
             Directory.CreateDirectory(labelsPath);
-            // Debug.Log($"Created directories for {split} split:");
-            // Debug.Log($"  Images: {imagesPath}");
-            // Debug.Log($"  Labels: {labelsPath}");
         }
     }
 
@@ -237,520 +171,498 @@ public class Synthesize : MonoBehaviour
         int validCount = Mathf.FloorToInt(totalImages * validSplit);
         int testCount = totalImages - trainCount - validCount;
 
-        // Debug.Log($"Starting dataset generation. Total images: {totalImages}");
-        // Debug.Log($"Split: Train={trainCount}, Valid={validCount}, Test={testCount}");
-
         GenerateSplit("train", trainCount);
         GenerateSplit("valid", validCount);
         GenerateSplit("test", testCount);
-
 
         Debug.Log("Dataset generation complete!");
     }
 
     void GenerateSplit(string split, int count)
     {
-        Debug.Log($"Generating {count} images for {split} split...");
         for (int i = 0; i < count; i++)
         {
-            float progress = (float)i / count * 100f;
-            
-            // Hide balls and table every 30th image
-            bool hideBalls = (i % 30 == 0);
-            if (hideBalls)
-            {
-                // Hide all pool balls
-                foreach (Transform ball in poolBalls)
-                {
-                    ball.gameObject.SetActive(false);
-                }
-                
-                // Hide the billiard table mesh
-                MeshRenderer tableMesh = GetComponent<MeshRenderer>();
-                if (tableMesh != null)
-                {
-                    tableMesh.enabled = false;
-                }
-            }
-            
+            // Randomize scene
             RandomizeScene();
-            CaptureAndSave(split, i, hideBalls);
             
-            // Show balls and table again if they were hidden
-            if (hideBalls)
+            // Capture and save image
+            CaptureAndSave(split, i);
+        }
+    }
+
+    List<ChessBoardSetup.PiecePlacement> GenerateRandomPosition()
+    {
+        // Start with a standard chess position
+        char[,] board = new char[8, 8];
+        string defaultFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        string[] ranks = defaultFEN.Split(' ')[0].Split('/');
+        
+        // Parse initial position
+        for (int rank = 0; rank < 8; rank++)
+        {
+            int file = 0;
+            foreach (char c in ranks[rank])
             {
-                foreach (Transform ball in poolBalls)
+                if (char.IsDigit(c))
                 {
-                    ball.gameObject.SetActive(true);
+                    for (int i = 0; i < int.Parse(c.ToString()); i++)
+                    {
+                        board[rank, file++] = '.';
+                    }
                 }
-                
-                // Show the billiard table mesh
-                MeshRenderer tableMesh = GetComponent<MeshRenderer>();
-                if (tableMesh != null)
+                else
                 {
-                    tableMesh.enabled = true;
+                    board[rank, file++] = c;
                 }
             }
         }
+        
+        // Generate random number of moves (0-50)
+        int numMoves = Random.Range(0, 21);
+        
+        for (int move = 0; move < numMoves; move++)
+        {
+            // Find all valid moves
+            List<(int fromRank, int fromFile, int toRank, int toFile)> validMoves = new List<(int, int, int, int)>();
+            
+            for (int fromRank = 0; fromRank < 8; fromRank++)
+            {
+                for (int fromFile = 0; fromFile < 8; fromFile++)
+                {
+                    char piece = board[fromRank, fromFile];
+                    if (piece == '.') continue;
+                    
+                    // Only move pieces of the current player's color
+                    bool isWhite = char.IsUpper(piece);
+                    if ((move % 2 == 0 && !isWhite) || (move % 2 == 1 && isWhite)) continue;
+                    
+                    // Check all possible moves for this piece
+                    for (int toRank = 0; toRank < 8; toRank++)
+                    {
+                        for (int toFile = 0; toFile < 8; toFile++)
+                        {
+                            char targetPiece = board[toRank, toFile];
+                            
+                            // Can't capture own pieces
+                            if (targetPiece != '.' && char.IsUpper(targetPiece) == isWhite) continue;
+                            
+                            // Don't allow capturing kings
+                            if (targetPiece == 'k' || targetPiece == 'K') continue;
+                            
+                            // Add move if it's valid
+                            validMoves.Add((fromRank, fromFile, toRank, toFile));
+                        }
+                    }
+                }
+            }
+            
+            // If no valid moves, break
+            if (validMoves.Count == 0) break;
+            
+            // Make a random move
+            var (srcRank, srcFile, dstRank, dstFile) = validMoves[Random.Range(0, validMoves.Count)];
+            board[dstRank, dstFile] = board[srcRank, srcFile];
+            board[srcRank, srcFile] = '.';
+        }
+        
+        // Ensure both kings are present
+        bool hasWhiteKing = false;
+        bool hasBlackKing = false;
+        for (int rank = 0; rank < 8; rank++)
+        {
+            for (int file = 0; file < 8; file++)
+            {
+                if (board[rank, file] == 'K') hasWhiteKing = true;
+                if (board[rank, file] == 'k') hasBlackKing = true;
+            }
+        }
+        
+        // If either king is missing, place them in their original positions
+        if (!hasWhiteKing) board[7, 4] = 'K'; // e1
+        if (!hasBlackKing) board[0, 4] = 'k'; // e8
+        
+        // Convert board to list of PiecePlacement
+        List<ChessBoardSetup.PiecePlacement> placements = new List<ChessBoardSetup.PiecePlacement>();
+        Dictionary<char, string> pieceMap = new Dictionary<char, string>
+        {
+            {'k', "Black king"},
+            {'q', "Black queen"},
+            {'r', "Black rook"},
+            {'b', "Black bishop"},
+            {'n', "Black knight"},
+            {'p', "Black pawn"},
+            {'K', "White king"},
+            {'Q', "White queen"},
+            {'R', "White rook"},
+            {'B', "White bishop"},
+            {'N', "White knight"},
+            {'P', "White pawn"}
+        };
+        
+        for (int rank = 0; rank < 8; rank++)
+        {
+            for (int file = 0; file < 8; file++)
+            {
+                char piece = board[rank, file];
+                if (piece != '.' && pieceMap.TryGetValue(piece, out string pieceName))
+                {
+                    placements.Add(new ChessBoardSetup.PiecePlacement
+                    {
+                        PieceName = pieceName,
+                        Position = new Vector2Int(file, 7 - rank) // Convert to 0-based coordinates
+                    });
+                }
+            }
+        }
+        
+        return placements;
     }
 
     void RandomizeScene()
     {
-        // Randomize table appearance
-        RandomizeTable();
+        // Randomly select a board
+        int idx = Random.Range(0, chessBoards.Length);
+        if (Random.value > 0.5f) {
+            idx = 1;
+        }
+        for (int i = 0; i < chessBoards.Length; i++)
+        {
+            chessBoards[i].gameObject.SetActive(i == idx);
+            if (i != idx)
+            {
+                chessBoards[i].DeactivateAllPieces(); // Deactivate all pieces on inactive boards
+            }
+        }
+        activeBoard = chessBoards[idx];
+
+        // Set up random chess position
+        var placements = GenerateRandomPosition();
+        activeBoard.SetupPosition(placements);
+
+        // Randomize camera to look at the active board
+        RandomizeCamera();
+
+        // Randomize lighting
+        RandomizeLighting();
 
         // Randomize skybox
         RandomizeSkybox();
 
-        // Randomize ball positions
-        RandomizeBallPositions();
-
-        // Position and orient cue stick
-        PositionCueStick();
-
-        // Randomize camera position and rotation
-        RandomizeCamera();
-        
-        // Randomize lighting
-        RandomizeLighting();
-
         // Randomize post-processing
         RandomizePostProcessing();
-
-        // Apply random motion blur
-        if (Random.value < motionBlurChance)
-        {
-            ApplyMotionBlur();
-        }
-    }
-
-    void RandomizeTable()
-    {
-        if (tableMaterial == null || tableTextures == null || tableTextures.Length == 0) return;
-
-        // Select a random texture from the list
-        Texture2D randomTexture = tableTextures[Random.Range(0, tableTextures.Length)];
-        
-        // Apply the new texture to the table material
-        tableMaterial.SetTexture("_BaseMap", randomTexture);
-        
-        // Randomize roughness for variety in appearance
-        float roughness = Random.Range(minTableRoughness, maxTableRoughness);
-        tableMaterial.SetFloat("_Smoothness", 1f - roughness); // Convert roughness to smoothness
-        
-        // Randomize normal map intensity slightly for texture variation
-        float normalIntensity = Random.Range(0.8f, 1.2f);
-        tableMaterial.SetFloat("_BumpScale", normalIntensity);
-    }
-
-    void RandomizeSkybox()
-    {
-        if (skyboxTextures == null || skyboxTextures.Length == 0) return;
-
-        // Get the current skybox material
-        Material skyboxMaterial = RenderSettings.skybox;
-        if (skyboxMaterial == null) return;
-
-        // Select a random cubemap from the list
-        Cubemap randomCubemap = skyboxTextures[Random.Range(0, skyboxTextures.Length)];
-        
-        // Apply the new cubemap to the skybox material
-        skyboxMaterial.SetTexture("_Tex", randomCubemap);
-        
-        // Force Unity to update the skybox
-        DynamicGI.UpdateEnvironment();
-    }
-
-    void PositionCueStick()
-    {
-        if (cueStick == null) return;
-
-        // Find the cue ball (assuming it's the first ball in the list)
-        Transform cueBall = poolBalls[0];
-        
-        // Random distance from cue ball
-        float distance = Random.Range(minCueDistance, maxCueDistance);
-        
-        
-        
-        
-        // Set cue position
-        cueStick.position = cueBall.position;
-        cueStick.GetChild(0).localPosition = new Vector3(Random.Range(-1.25f, -0.75f), cueStick.GetChild(0).localPosition.y, cueStick.GetChild(0).localPosition.z);
-        
-        // Calculate direction to cue ball
-        //Vector3 directionToBall = (cueBall.position - cueStick.position).normalized;
-        
-        // Add random tilt
-        float tiltAngle = Random.Range(minCueAngle, maxCueAngle);
-        
-        // Set rotation
-        Quaternion baseRotation = Quaternion.AngleAxis(Random.Range(-60f, 60f), Vector3.up);
-        Quaternion tiltRotation = Quaternion.AngleAxis(tiltAngle, Vector3.forward);
-        cueStick.rotation = baseRotation * tiltRotation;
     }
 
     void RandomizeCamera()
     {
-        // Get table center position
-        Vector3 tableCenter = new Vector3(0, tableHeight, 0);
+        // Randomly choose white or black perspective
+        bool isWhitePerspective = Random.value > 0.5f;
         
-        // Random player height
-        float playerHeight = Random.Range(minPlayerHeight, maxPlayerHeight);
+        // Base position for each perspective
+        float baseDistance = Random.Range(minDistanceFromBoard, maxDistanceFromBoard);
+        float baseHeight = Random.Range(1.4f, 1.8f); // Average human eye height
+        float baseAngle = isWhitePerspective ? 90f : 270f; // 0 for white, 180 for black
         
-        // Random position around the table center
-        float angle = Random.Range(-180f, 180f); // Focus on a 360-degree arc
-        float distance = Random.Range(minDistanceFromTable, maxDistanceFromTable);
+        // Add random offsets for natural variation
+        float distanceOffset = Random.Range(-0.3f, 0.3f);
+        float heightOffset = Random.Range(-0.2f, 0.2f);
+        float angleOffset = Random.Range(-10f, 10f); // Reduced angle variation
+        float tiltOffset = Random.Range(-5f, 5f);
         
-        // Calculate position based on angle and distance from table center
-        float x = Mathf.Cos(angle * Mathf.Deg2Rad) * distance;
-        float z = Mathf.Sin(angle * Mathf.Deg2Rad) * distance;
+        // Calculate final position
+        float finalDistance = baseDistance + distanceOffset;
+        float finalHeight = baseHeight + heightOffset;
+        float finalAngle = baseAngle + angleOffset;
         
-        // Set camera position at player height
-        mainCamera.transform.position = new Vector3(x, playerHeight, z);
+        // Position camera behind the board
+        Vector3 position = new Vector3(
+            Mathf.Cos(finalAngle * Mathf.Deg2Rad) * finalDistance,
+            finalHeight,
+            Mathf.Sin(finalAngle * Mathf.Deg2Rad) * finalDistance
+        );
         
-        // Calculate look direction towards table center
-        Vector3 lookDirection = tableCenter - mainCamera.transform.position;
-        //lookDirection.y = 0; // Keep the look direction horizontal
+        mainCamera.transform.position = position;
         
-        // Add random up/down angle
-        float lookAngle = Random.Range(minLookAngle, maxLookAngle);
+        // Look at the center of the board
+        mainCamera.transform.LookAt(activeBoard.transform.position);
         
-        // Set rotation
-        mainCamera.transform.rotation = Quaternion.LookRotation(lookDirection) * Quaternion.Euler(lookAngle, 0, 0);
-
-        // Set FOV and aspect ratio
-        //mainCamera.fieldOfView = 76.66f; //Specs FOV
-        //mainCamera.aspect = 1.333f; //Specs aspect
-
-        //square aspect ratio
-        mainCamera.fieldOfView = 61.33f; //Specs FOV
-        mainCamera.aspect = 1.0f; //Specs aspect
-
-        //Debug.Log($"Camera pos: {mainCamera.transform.position}, Looking at table center: {tableCenter}");
+        // Add slight downward tilt for natural viewing angle
+        float downwardTilt = Random.Range(5f, 15f);
+        mainCamera.transform.RotateAround(mainCamera.transform.position, mainCamera.transform.right, downwardTilt);
+        
+        // Add random tilt for natural head position
+        mainCamera.transform.RotateAround(mainCamera.transform.position, mainCamera.transform.right, tiltOffset);
+        
+        // Add slight random roll for natural head tilt
+        float rollOffset = Random.Range(-2f, 2f);
+        mainCamera.transform.RotateAround(mainCamera.transform.position, mainCamera.transform.forward, rollOffset);
     }
 
     void RandomizeLighting()
     {
-        // Get the URP asset to modify shadow settings
-        var urpAsset = QualitySettings.renderPipeline as UniversalRenderPipelineAsset;
-        if (urpAsset != null)
-        {
-            // Make shadows darker
-            urpAsset.shadowDistance = 2.0f; // Increase shadow distance
-            urpAsset.shadowCascadeCount = 4; // Use 4 cascades for better quality
-            urpAsset.shadowDepthBias = 1.0f; // Increase shadow depth bias
-            urpAsset.shadowNormalBias = 1.0f; // Increase shadow normal bias
-            //urpAsset.shadowSoftShadows = true; // Enable soft shadows
-        }
-
-        // Set ambient lighting
-        RenderSettings.ambientMode = AmbientMode.Skybox;
-        RenderSettings.ambientIntensity = ambientIntensity;
-
         foreach (Light light in sceneLights)
         {
             if (light != null)
             {
-                // Enhanced lighting settings
+                // Randomize intensity
                 light.intensity = Random.Range(minIntensity, maxIntensity);
-                light.shadows = LightShadows.Soft; // Changed to soft shadows
-                light.shadowStrength = Random.Range(0.6f, 0.8f); // Reduced shadow strength for softer shadows
-                light.shadowBias = 0.02f; // Reduced bias for sharper shadows
-                light.shadowNormalBias = 0.2f; // Reduced normal bias
-                light.shadowNearPlane = 0.1f;
-                
-                // Warmer color temperature range for more natural lighting
-                float temperature = Random.Range(3000f, 5500f); // Adjusted Kelvin temperature range
-                Color color = Mathf.CorrelatedColorTemperatureToRGB(temperature);
-                light.color = color;
-                
-                // Randomize light range and spot angle if it's a spot light
-                if (light.type == LightType.Spot)
-                {
-                    light.range = Random.Range(8f, 12f); // Increased range
-                    light.spotAngle = Random.Range(40f, 80f); // Increased spot angle
-                }
-                
-                // Calculate random point on floor within 5m radius
-                float angle = Random.Range(0f, 360f);
-                float distance = Random.Range(0f, 5f);
-                Vector3 targetPoint = new Vector3(
-                    Mathf.Cos(angle * Mathf.Deg2Rad) * distance,
-                    0f,
-                    Mathf.Sin(angle * Mathf.Deg2Rad) * distance
-                );
-                
-                // Make light look at the target point
-                light.transform.LookAt(targetPoint);
-            }
-        }
-    }
 
-    void RandomizeBallPositions()
-    {
-        List<Vector3> positions = new List<Vector3>();
+                // Vary color temperature
+                light.useColorTemperature = true;
+                light.colorTemperature = Random.Range(3500f, 7000f); // 3500K (warm) to 7000K (cool)
         
-        foreach (Transform ball in poolBalls)
-        {
-            Vector3 newPos;
-            bool validPosition;
-            int attempts = 0;
-            
-            do
-            {
-                newPos = new Vector3(
-                    Random.Range(-tableLength/2.0f + ballRadius, tableLength/2.0f - ballRadius),
-                    tableHeight,
-                    Random.Range(-tableWidth/2.0f + ballRadius, tableWidth/2.0f - ballRadius)
+                
+                // Slightly desaturate the light colors
+                light.color = new Color(
+                    Random.Range(0.9f, 1.2f),
+                    Random.Range(0.9f, 1.2f),
+                    Random.Range(0.9f, 1.2f)
                 );
-                
-                validPosition = true;
-                foreach (Vector3 pos in positions)
+
+                // Randomize light position if it's a directional light
+                if (light.type == LightType.Directional)
                 {
-                    if (Vector3.Distance(newPos, pos) < ballRadius*2.0f)
-                    {
-                        validPosition = false;
-                        break;
-                    }
+                    // Random rotation around the board
+                    float angle = Random.Range(0f, 360f);
+                    float height = Random.Range(30f, 60f);
+                    light.transform.rotation = Quaternion.Euler(height, angle, 0);
                 }
+
+                // Configure shadow settings
+                light.shadows = LightShadows.Soft;
+                light.shadowStrength = Random.Range(minShadowStrength, maxShadowStrength);
+                light.shadowBias = Random.Range(minShadowBias, maxShadowBias);
+                light.shadowNormalBias = Random.Range(minShadowNormalBias, maxShadowNormalBias);
                 
-                attempts++;
-            } while (!validPosition && attempts < 100);
-            
-            if (validPosition)
-            {
-                ball.localPosition = newPos;
-                ball.rotation = Quaternion.Euler(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-                positions.Add(newPos);
+                // Randomize shadow softness
+                light.shadowRadius = Random.Range(1f, 3f);
+                
+                // Randomize shadow resolution
+                int[] resolutions = { 1024, 2048, 4096 };
+                light.shadowResolution = (LightShadowResolution)Random.Range(0, 3);
             }
         }
+        
+        // Set ambient lighting
+        RenderSettings.ambientLight = new Color(ambientIntensity, ambientIntensity, ambientIntensity);
+        
+        // Randomize ambient occlusion
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+        RenderSettings.ambientIntensity = Random.Range(0.8f, 1.2f);
     }
 
-    void ApplyMotionBlur()
+    void RandomizeSkybox()
     {
-        foreach (Transform ball in poolBalls)
+        if (skyboxTextures != null && skyboxTextures.Length > 0)
         {
-            // Add Rigidbody if it doesn't exist
-            Rigidbody rb = ball.GetComponent<Rigidbody>();
-            if (rb == null)
-            {
-                rb = ball.gameObject.AddComponent<Rigidbody>();
-                rb.mass = 0.17f; // Standard pool ball mass
-                rb.linearDamping = 0.1f;
-                rb.angularDamping = 0.1f;
-                rb.interpolation = RigidbodyInterpolation.Interpolate; // Enable interpolation for smoother motion
-            }
-
-            // Apply random force
-            float force = Random.Range(minForce, maxForce);
-            float angle = Random.Range(0f, 360f);
-            Vector3 forceDirection = new Vector3(
-                Mathf.Cos(angle * Mathf.Deg2Rad),
-                0,
-                Mathf.Sin(angle * Mathf.Deg2Rad)
-            );
-            rb.AddForce(forceDirection * force, ForceMode.Impulse);
+            RenderSettings.skybox.SetTexture("_Tex", skyboxTextures[Random.Range(0, skyboxTextures.Length)]);
         }
     }
 
     void RandomizePostProcessing()
     {
-        if (postProcessVolume != null && postProcessVolume.profile != null)
+        if (bloom != null)
         {
-            // Randomize bloom
-            // if (bloom != null)
-            // {
-            //     bloom.intensity.value = Random.Range(0.0f, 1.5f);
-            //     bloom.threshold.value = Random.Range(0.7f, 1.2f);
-            //     bloom.scatter.value = Random.Range(0.5f, 0.7f);
-            // }
-
-            // Randomize color adjustments
-            if (colorAdjustments != null)
-            {
-                colorAdjustments.postExposure.value = Random.Range(0f, 0.5f);
-                colorAdjustments.contrast.value = Random.Range(-5f, 25f);
-                // colorAdjustments.colorFilter.value = new Color(
-                //     Random.Range(0.8f, 1.2f),  // R
-                //     Random.Range(0.8f, 1.2f),  // G
-                //     Random.Range(0.8f, 1.2f)   // B 
-                // );
-                colorAdjustments.hueShift.value = Random.Range(-2f, 2f);
-                colorAdjustments.saturation.value = Random.Range(-5f, 5f);
-                //colorAdjustments.temperature.value = Random.Range(0.0f, 1.0f);
-                //colorAdjustments.tint.value = Random.Range(0.0f, 1.0f);
-                //colorAdjustments.brighter.value = Random.Range(-1.0f, 1.0f);
-               
-            }
-
-            // Subtle vignette
-            // if (vignette != null)
-            // {
-            //     vignette.intensity.value = Random.Range(0.2f, 0.4f);
-            //     vignette.smoothness.value = Random.Range(0.2f, 0.4f);
-            // }
-
-            // Subtle chromatic aberration
-            // if (chromaticAberration != null)
-            // {
-            //     print("chromatic aberration");
-            //     chromaticAberration.intensity.value =  Random.Range(0.0f, 0.3f);
-            // }
-
-            // Subtle film grain
-            if (filmGrain != null)
-            {
-                filmGrain.intensity.value = Random.Range(0.0f, 0.6f);
-                filmGrain.type.value = (FilmGrainLookup)Random.Range(0, 3);
-            }
+            bloom.intensity.value = Random.Range(0.1f, 0.4f);
+            bloom.threshold.value = Random.Range(0.7f, 1.2f);
         }
-        else
+        
+        if (colorAdjustments != null)
         {
-            Debug.LogError("Post Process Volume or profile is null!");
+            // Reduce exposure to prevent over-exposure
+            colorAdjustments.postExposure.value = Random.Range(-0.5f, 0.1f);
+            colorAdjustments.contrast.value = Random.Range(0f, 15f);
+            
+            // Random hue shift (-180 to 180 degrees)
+            colorAdjustments.hueShift.value = Random.Range(-10f, 10f);
+            
+            // Random saturation (-100 to 0)
+            colorAdjustments.saturation.value = Random.Range(-5f, 10f);
+            
+            // Random color filter
+            Color randomColor = new Color(
+                Random.Range(0.8f, 1.0f),  // Red
+                Random.Range(0.8f, 1.0f),  // Green
+                Random.Range(0.8f, 1.0f),  // Blue
+                1.0f
+            );
+            colorAdjustments.colorFilter.value = randomColor;
+        }
+        
+        if (vignette != null)
+        {
+            vignette.intensity.value = Random.Range(0.2f, 0.4f);
+        }
+        
+        if (chromaticAberration != null)
+        {
+            chromaticAberration.intensity.value = Random.Range(0.0f, 0.3f);
+        }
+        
+        if (filmGrain != null)
+        {
+            var grainTypes = (FilmGrainLookup[])System.Enum.GetValues(typeof(FilmGrainLookup));
+            filmGrain.type.value = grainTypes[Random.Range(0, grainTypes.Length)];
+            filmGrain.intensity.value = Random.Range(0.0f, 0.4f);
         }
     }
 
-    void CaptureAndSave(string split, int index, bool hideBalls = false)
+    Bounds TransformBounds(Bounds localBounds, Transform transform)
     {
-        // Create render texture with HDR support
+        Vector3 center = transform.TransformPoint(localBounds.center);
+        Vector3 extents = localBounds.extents;
+        Vector3 axisX = transform.TransformVector(extents.x, 0, 0);
+        Vector3 axisY = transform.TransformVector(0, extents.y, 0);
+        Vector3 axisZ = transform.TransformVector(0, 0, extents.z);
+        Vector3 worldExtents = new Vector3(
+            Mathf.Abs(axisX.x) + Mathf.Abs(axisY.x) + Mathf.Abs(axisZ.x),
+            Mathf.Abs(axisX.y) + Mathf.Abs(axisY.y) + Mathf.Abs(axisZ.y),
+            Mathf.Abs(axisX.z) + Mathf.Abs(axisY.z) + Mathf.Abs(axisZ.z)
+        );
+        return new Bounds(center, worldExtents * 2);
+    }
+
+    void CaptureAndSave(string split, int index)
+    {
+        // Create render texture with matching anti-aliasing
         RenderTexture rt = new RenderTexture(renderWidth, renderHeight, 24, RenderTextureFormat.ARGB32);
-        rt.antiAliasing = 1;
-        rt.enableRandomWrite = true;
-        
-        // Store original camera settings
-        RenderTexture originalRT = mainCamera.targetTexture;
-        bool originalHDR = mainCamera.allowHDR;
-        
-        // Set up camera for capture
+        rt.antiAliasing = 1; // Match camera's anti-aliasing
         mainCamera.targetTexture = rt;
-        mainCamera.allowHDR = true;
         
-        // Ensure post-processing is enabled
-        UniversalAdditionalCameraData cameraData = mainCamera.GetUniversalAdditionalCameraData();
-        if (cameraData != null)
-        {
-            cameraData.renderPostProcessing = true;
-        }
-        
-        // Render the scene
+        // Render
         mainCamera.Render();
         
-        // Create a temporary texture to read the render texture
-        Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+        // Read pixels
         RenderTexture.active = rt;
-        tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-        tex.Apply();
-
-        // Save the image
-        string imagePath = Path.Combine(Application.dataPath, "..", outputFolder, split, "images", $"image_{index}.jpg");
-        byte[] bytes = tex.EncodeToJPG(90);
-        File.WriteAllBytes(imagePath, bytes);
+        Texture2D screenshot = new Texture2D(renderWidth, renderHeight, TextureFormat.RGB24, false);
+        screenshot.ReadPixels(new Rect(0, 0, renderWidth, renderHeight), 0, 0);
+        screenshot.Apply();
         
-        // Cleanup
-        Destroy(tex);
-        mainCamera.targetTexture = originalRT;
-        mainCamera.allowHDR = originalHDR;
-        Destroy(rt);
-        RenderTexture.active = null;
-        
-        // Generate and save YOLO format labels
-        string labelPath = Path.Combine(Application.dataPath, "..", outputFolder, split, "labels", $"image_{index}.txt");
-        SaveYOLOLabels(labelPath, hideBalls);
-        
-        // Reset ball velocities
-        foreach (Transform ball in poolBalls)
+        // Save image
+        string imagePath = Path.Combine(Application.dataPath, "..", outputFolder, split, "images", $"image_{index:D6}.jpg");
+        using (var fs = new FileStream(imagePath, FileMode.Create, FileAccess.Write))
         {
-            Rigidbody rb = ball.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-            }
+            byte[] pngData = screenshot.EncodeToJPG(90);
+            fs.Write(pngData, 0, pngData.Length);
         }
-    }
 
-    // void SaveRenderTexture(RenderTexture rt, string path)
-    // {
-    //     RenderTexture.active = rt;
-    //     Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
-    //     tex.filterMode = FilterMode.Trilinear;
-    //     tex.anisoLevel = 9;
-    //     tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-    //     tex.Apply();
-        
-    //     byte[] bytes = tex.EncodeToJPG(80); // Save as JPEG with 80% quality
-    //     File.WriteAllBytes(path, bytes);
-        
-    //     Destroy(tex);
-    //     RenderTexture.active = null;
-    // }
+        // Generate and save YOLO format labels
+        List<string> yoloLabels = new List<string>();
 
-    void SaveYOLOLabels(string path, bool hideBalls = false)
-    {
-        List<string> labels = new List<string>();
-        
-        if (!hideBalls)
+        // Define multipliers for each piece type (for height only)
+        Dictionary<string, float> pieceHeightMultipliers = new Dictionary<string, float>
         {
-            for (int i = 0; i < poolBalls.Count; i++)
+            {"king", 1.6f},
+            {"queen", 1.5f},
+            {"rook", 1.2f},
+            {"bishop", 1.4f},
+            {"knight", 1.1f},
+            {"pawn", 0.8f}
+        };
+
+        float squareWidth = activeBoard.GetSquareWidth();
+
+        foreach (var piece in activeBoard.GetActivePieces())
+        {
+            // Get all mesh renderers for the pieces
+            //var meshRenderers = piece.GetComponentsInChildren<MeshRenderer>();
+            Mesh mesh = piece.GetComponent<MeshFilter>().mesh;
+            Bounds localBounds = mesh.bounds;
+            Bounds bounds = TransformBounds(localBounds, piece.transform);
+
+            // Cylinder parameters from mesh bounds
+            //Vector3 baseCenter = new Vector3(bounds.center.x, bounds.min.y, bounds.center.z);
+            Vector3 baseCenter = piece.transform.position;
+            float height = 1.0f * Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+            float radius = 0.9f *Mathf.Min(bounds.size.x, bounds.size.y, bounds.size.z) / 2f;
+
+            // 4 points at the base
+            Vector3 baseForward = baseCenter + activeBoard.transform.forward * radius;
+            Vector3 baseBack = baseCenter - activeBoard.transform.forward * radius;
+            Vector3 baseRight = baseCenter + activeBoard.transform.right * radius;
+            Vector3 baseLeft = baseCenter - activeBoard.transform.right * radius;
+
+            // 4 points at the top
+            float radiusTop = 0.75f * radius;
+            Vector3 up = Vector3.up * height + baseCenter;
+            Vector3 topForward = up + activeBoard.transform.forward * radiusTop;
+            Vector3 topBack = up - activeBoard.transform.forward * radiusTop;
+            Vector3 topRight = up + activeBoard.transform.right * radiusTop;
+            Vector3 topLeft = up - activeBoard.transform.right * radiusTop;
+
+            // Project all 8 points to screen space
+            Vector3[] screenPoints = new Vector3[8];
+            screenPoints[0] = mainCamera.WorldToScreenPoint(baseForward);
+            screenPoints[1] = mainCamera.WorldToScreenPoint(baseBack);
+            screenPoints[2] = mainCamera.WorldToScreenPoint(baseRight);
+            screenPoints[3] = mainCamera.WorldToScreenPoint(baseLeft);
+            screenPoints[4] = mainCamera.WorldToScreenPoint(topForward);
+            screenPoints[5] = mainCamera.WorldToScreenPoint(topBack);
+            screenPoints[6] = mainCamera.WorldToScreenPoint(topRight);
+            screenPoints[7] = mainCamera.WorldToScreenPoint(topLeft);
+
+            // Find min/max screen coordinates
+            float minX = float.MaxValue;
+            float minY = float.MaxValue;
+            float maxX = float.MinValue;
+            float maxY = float.MinValue;
+            bool anyInFront = false;
+
+            foreach (Vector3 point in screenPoints)
             {
-                Transform ball = poolBalls[i];
-                Vector3 screenPoint = mainCamera.WorldToViewportPoint(ball.position);
-                
-                // Skip if ball is behind camera or outside viewport
-                if (screenPoint.z < 0 || screenPoint.x < 0 || screenPoint.x > 1 || screenPoint.y < 0 || screenPoint.y > 1)
-                    continue;
-                
-                // Convert to YOLO format (x_center, y_center, width, height)
-                float x = screenPoint.x;
-                float y = 1.0f - screenPoint.y;
-
-                // Get points offset by ball radius in screen space
-                Vector3 leftPoint = ball.position - mainCamera.transform.right * ballRadius;
-                Vector3 rightPoint = ball.position + mainCamera.transform.right * ballRadius;
-                Vector3 upPoint = ball.position + mainCamera.transform.up * ballRadius;
-                Vector3 downPoint = ball.position - mainCamera.transform.up * ballRadius;
-
-                // Convert to screen space
-                Vector3 leftScreen = mainCamera.WorldToViewportPoint(leftPoint);
-                Vector3 rightScreen = mainCamera.WorldToViewportPoint(rightPoint);
-                Vector3 upScreen = mainCamera.WorldToViewportPoint(upPoint);
-                Vector3 downScreen = mainCamera.WorldToViewportPoint(downPoint);
-
-                // Calculate normalized width and height
-                float normalizedWidth = Mathf.Abs(rightScreen.x - leftScreen.x);
-                float normalizedHeight = Mathf.Abs(upScreen.y - downScreen.y);
-                
-                // Add class ID using the index of the ball
-                string label = $"{i} {x} {y} {normalizedWidth} {normalizedHeight}";
-                labels.Add(label);
-            }
-
-            // Add pocket bounding boxes
-            if (tablePockets != null)
-            {
-                int pocketClassId = poolBalls.Count; // Next class after balls
-                float pocketBoxSize = 0.05f; // Adjust as needed
-
-                foreach (Transform pocket in tablePockets)
+                if (point.z > 0)
                 {
-                    Vector3 screenPoint = mainCamera.WorldToViewportPoint(pocket.position);
-
-                    // Skip if pocket is behind camera or outside viewport
-                    if (screenPoint.z < 0 || screenPoint.x < 0 || screenPoint.x > 1 || screenPoint.y < 0 || screenPoint.y > 1)
-                        continue;
-
-                    float x = screenPoint.x;
-                    float y = 1.0f - screenPoint.y;
-
-                    string label = $"{pocketClassId} {x} {y} {pocketBoxSize} {pocketBoxSize}";
-                    labels.Add(label);
+                    minX = Mathf.Min(minX, point.x);
+                    minY = Mathf.Min(minY, point.y);
+                    maxX = Mathf.Max(maxX, point.x);
+                    maxY = Mathf.Max(maxY, point.y);
+                    anyInFront = true;
                 }
             }
+            if (!anyInFront) continue;
+
+            // Convert to normalized coordinates (0-1)
+            float x_center = (minX + maxX) / 2f / renderWidth;
+            float y_center = (minY + maxY) / 2f / renderHeight;
+            y_center = 1.0f - y_center; // Flip for YOLO
+            float width = (maxX - minX) / renderWidth;
+            float heightBox = (maxY - minY) / renderHeight;
+
+            if (x_center < 0.0f || x_center > 1.0f || y_center < 0.0f || y_center > 1.0f) {
+                continue;
+            }
+            // Clamp values
+            x_center = Mathf.Clamp01(x_center);
+            y_center = Mathf.Clamp01(y_center);
+            width = Mathf.Clamp01(width);
+            heightBox = Mathf.Clamp01(heightBox);
+
+            // Get class ID
+            string pieceName = piece.name.Replace("(Clone)", "").Trim();
+            if (classMapping.TryGetValue(pieceName, out int classId))
+            {
+                yoloLabels.Add($"{classId} {x_center:F6} {y_center:F6} {width:F6} {heightBox:F6}");
+            }
+        }
+
+        // Save labels
+        string labelPath = Path.Combine(Application.dataPath, "..", outputFolder, split, "labels", $"image_{index:D6}.txt");
+        using (var sw = new StreamWriter(labelPath, false))
+        {
+            foreach (var line in yoloLabels)
+                sw.WriteLine(line);
         }
         
-        File.WriteAllLines(path, labels);
+        // Clean up
+        RenderTexture.active = null;
+        mainCamera.targetTexture = null;
+        Destroy(rt);
+        Destroy(screenshot);
+
+        // Periodically unload unused assets and force GC
+        if (index % 100 == 0)
+        {
+            Resources.UnloadUnusedAssets();
+            System.GC.Collect();
+        }
     }
-
-
 }
